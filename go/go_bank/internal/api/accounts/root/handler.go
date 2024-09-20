@@ -1,34 +1,47 @@
-package api
+package root
 
 import (
-	t "github.com/wley3337/learning/tree/main/go/go_bank/types"
-
+	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
 	"log"
 	"net/http"
 
-	"github.com/google/uuid"
+	"github.com/wley3337/learning/tree/main/go/go_bank/internal/handler"
+	t "github.com/wley3337/learning/tree/main/go/go_bank/types"
 )
 
-func (s *APIServer) handleAccount(w http.ResponseWriter, r *http.Request) error {
+type Handler struct {
+	DB *sql.DB
+}
+
+func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	var err error
+
+	st := defaultStore{h.DB}
+
 	switch method := r.Method; method {
 	case "GET":
-		return s.handleGetAccounts(w, r)
+		err = handleGetAccounts(w, r, st)
 	case "POST":
-		return s.handleCreateAccount(w, r)
+		err = handleCreateAccount(w, r, st)
 	default:
-		return fmt.Errorf("Method not allowed %s", r.Method)
+		err = fmt.Errorf("Method not allowed %s", r.Method)
+	}
+
+	if err != nil {
+		handler.WriteJSONError(w, http.StatusInternalServerError, err)
 	}
 }
 
-func (s *APIServer) handleGetAccounts(w http.ResponseWriter, r *http.Request) error {
-	accounts, err := s.store.GetAccounts()
+func handleGetAccounts(w http.ResponseWriter, r *http.Request, st defaultStore) error {
+	accounts, err := st.GetAccounts()
 	if err != nil {
 		log.Println("Error getting accounts")
 		return err
 	}
-	return WriteJSON(w, http.StatusOK, accounts)
+	return handler.WriteJSON(w, http.StatusOK, accounts)
 }
 
 type CreateAccountRequestBody struct {
@@ -38,7 +51,7 @@ type CreateAccountRequestBody struct {
 	Balance       int64     `json:"balance"`
 }
 
-func (s *APIServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) error {
+func handleCreateAccount(w http.ResponseWriter, r *http.Request, st defaultStore) error {
 	req := new(CreateAccountRequestBody)
 
 	// this needs to parse the JSON from the body
@@ -60,15 +73,15 @@ func (s *APIServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) 
 	account.LastName = req.LastName
 
 	// call the create account with that struct
-	acc, err := s.store.CreateAccount(account)
+	acc, err := st.CreateAccount(account)
 
 	if err != nil {
 		return err
 	}
 
-	return WriteJSON(w, http.StatusCreated, acc)
+	return handler.WriteJSON(w, http.StatusCreated, acc)
 }
 
-func (s *APIServer) handleTransfer(w http.ResponseWriter, r *http.Request) error {
+func handleTransfer(w http.ResponseWriter, r *http.Request, st defaultStore) error {
 	return nil
 }

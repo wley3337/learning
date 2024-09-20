@@ -1,28 +1,41 @@
-package api
+package detail
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/gorilla/mux"
+	"github.com/wley3337/learning/tree/main/go/go_bank/internal/handler"
 )
 
-func (s *APIServer) handleAccountDetails(w http.ResponseWriter, r *http.Request) error {
+type Handler struct {
+	DB *sql.DB
+}
+
+func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	var err error
+
+	st := defaultStore{h.DB}
+
 	switch method := r.Method; method {
 	case "GET":
-		return s.handleGetAccountByID(w, r)
+		err = handleGetAccountByID(w, r, st)
 	case "DELETE":
-		return s.handleDeleteAccount(w, r)
+		err = handleDeleteAccount(w, r, st)
 	default:
-		return fmt.Errorf("Method not allowed %s", r.Method)
+		err = fmt.Errorf("Method not allowed %s", r.Method)
+	}
 
+	if err != nil {
+		handler.WriteJSONError(w, http.StatusInternalServerError, err)
 	}
 }
 
 // detail
-func (s *APIServer) handleGetAccountByID(w http.ResponseWriter, r *http.Request) error {
+func handleGetAccountByID(w http.ResponseWriter, r *http.Request, st defaultStore) error {
 	// doesn't error if no id provided, just empty string
 	ID := mux.Vars(r)["id"]
 	log.Println("getting account by id:",
@@ -34,16 +47,16 @@ func (s *APIServer) handleGetAccountByID(w http.ResponseWriter, r *http.Request)
 		return fmt.Errorf("Invalid ID given %s", ID)
 	}
 	// call the create account with that struct
-	acc, err := s.store.GetAccountByID(id)
+	acc, err := st.GetAccountByID(id)
 
 	if err != nil {
 		return err
 	}
 
-	return WriteJSON(w, http.StatusOK, acc)
+	return handler.WriteJSON(w, http.StatusOK, acc)
 }
 
-func (s *APIServer) handleDeleteAccount(w http.ResponseWriter, r *http.Request) error {
+func handleDeleteAccount(w http.ResponseWriter, r *http.Request, st defaultStore) error {
 	ID := mux.Vars(r)["id"]
 	log.Println("deleting account by id:",
 		ID)
@@ -54,12 +67,12 @@ func (s *APIServer) handleDeleteAccount(w http.ResponseWriter, r *http.Request) 
 		return fmt.Errorf("Invalid ID given %s", ID)
 	}
 
-	err := s.store.DeleteAccount(id)
+	err := st.DeleteAccount(id)
 
 	if err != nil {
 		return err
 	}
 
 	response := "Deleted account with id: " + ID
-	return WriteJSON(w, http.StatusOK, response)
+	return handler.WriteJSON(w, http.StatusOK, response)
 }
